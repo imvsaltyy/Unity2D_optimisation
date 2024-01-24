@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -102,6 +103,8 @@ public class FlockBehaviour : MonoBehaviour
     flocks[0].numBoids += count;
   }
 
+  
+
   void AddBoid(float x, float y, Flock flock)
   {
     GameObject obj = Instantiate(flock.PrefabBoid);
@@ -122,7 +125,7 @@ public class FlockBehaviour : MonoBehaviour
   {
     Vector3 flockDir = Vector3.zero;
     Vector3 separationDir = Vector3.zero;
-    Vector3 cohesionDir = Vector3.zero;
+    //Vector3 cohesionDir = Vector3.zero;
 
     float speed = 0.0f;
     float separationSpeed = 0.0f;
@@ -130,32 +133,39 @@ public class FlockBehaviour : MonoBehaviour
     int count = 0;
     int separationCount = 0;
     Vector3 steerPos = Vector3.zero;
-
+    
     Autonomous curr = flock.mAutonomous[i];
+    Vector3 currPosition = curr.pos;
+
+
     for (int j = 0; j < flock.numBoids; ++j)
     {
+      //used this instead of 2 if-statements
+      //used 'continue' to skip unnecessary iterations
+      if(i == j)
+        continue;
+
       Autonomous other = flock.mAutonomous[j];
-      float dist = (curr.transform.position - other.transform.position).magnitude;
-      if (i != j && dist < flock.visibility)
+      float sqrDist = (currPosition - other.pos).sqrMagnitude;
+      //removed if(i!=j)
+      if (sqrDist < flock.visibility * flock.visibility)
       {
         speed += other.Speed;
         flockDir += other.TargetDirection;
-        steerPos += other.transform.position;
+        steerPos += other.pos;
         count++;
       }
-      if (i != j)
-      {
-        if (dist < flock.separationDistance)
+      //removed if(i!=j)
+      if (sqrDist < flock.separationDistance * flock.separationDistance)
         {
-          Vector3 targetDirection = (
-            curr.transform.position -
-            other.transform.position).normalized;
+          Vector3 targetDirection = (currPosition - other.pos).normalized;
 
           separationDir += targetDirection;
-          separationSpeed += dist * flock.weightSeparation;
+          separationSpeed += Mathf.Sqrt(sqrDist) * flock.weightSeparation;
+          separationCount++;
         }
       }
-    }
+    
     if (count > 0)
     {
       speed = speed / count;
@@ -167,7 +177,7 @@ public class FlockBehaviour : MonoBehaviour
 
     if (separationCount > 0)
     {
-      separationSpeed = separationSpeed / count;
+      separationSpeed = separationSpeed / separationCount;
       separationDir = separationDir / separationSpeed;
       separationDir.Normalize();
     }
@@ -175,7 +185,7 @@ public class FlockBehaviour : MonoBehaviour
     curr.TargetDirection =
       flockDir * speed * (flock.useAlignmentRule ? flock.weightAlignment : 0.0f) +
       separationDir * separationSpeed * (flock.useSeparationRule ? flock.weightSeparation : 0.0f) +
-      (steerPos - curr.transform.position) * (flock.useCohesionRule ? flock.weightCohesion : 0.0f);
+      (steerPos - curr.pos) * (flock.useCohesionRule ? flock.weightCohesion : 0.0f);
   }
 
 
@@ -188,20 +198,23 @@ public class FlockBehaviour : MonoBehaviour
         foreach (Flock flock in flocks)
         {
           List<Autonomous> autonomousList = flock.mAutonomous;
-          for (int i = 0; i < autonomousList.Count; ++i)
+
+          Parallel.For(0, autonomousList.Count, i =>
           {
             Execute(flock, i);
+
             if (i % BatchSize == 0)
             {
-              yield return null;
+              Debug.Log("flocking");
+              //yield return null;
             }
-          }
+          });
           yield return null;
         }
       }
       yield return new WaitForSeconds(TickDuration);
     }
-  }
+}
 
 
   void SeparationWithEnemies_Internal(

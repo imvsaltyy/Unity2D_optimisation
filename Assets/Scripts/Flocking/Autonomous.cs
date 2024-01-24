@@ -20,12 +20,16 @@ public class Autonomous : MonoBehaviour
 
   public SpriteRenderer spriteRenderer;
 
+  public Vector3 pos;
+
   // Start is called before the first frame update
   void Start()
   {
     Speed = 0.0f;
     SetRandomSpeed();
     SetRandomDirection();
+
+    pos = transform.position;
   }
 
   void SetRandomSpeed()
@@ -49,6 +53,7 @@ public class Autonomous : MonoBehaviour
   // Update is called once per frame
   public void Update()
   {
+    
     Vector3 targetDirection = TargetDirection;
     targetDirection.Normalize();
 
@@ -71,6 +76,7 @@ public class Autonomous : MonoBehaviour
       Speed = MaxSpeed;
 
     transform.Translate(Vector3.right * Speed * Time.deltaTime, Space.Self);
+    pos = transform.position;
   }
 
   private void FixedUpdate()
