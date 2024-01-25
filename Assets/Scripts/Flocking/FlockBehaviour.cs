@@ -121,75 +121,78 @@ public class FlockBehaviour : MonoBehaviour
     return (a1.transform.position - a2.transform.position).magnitude;
   }
 
-  void Execute(Flock flock, int i)
-  {
-    Vector3 flockDir = Vector3.zero;
-    Vector3 separationDir = Vector3.zero;
-    //Vector3 cohesionDir = Vector3.zero;
-
-    float speed = 0.0f;
-    float separationSpeed = 0.0f;
-
-    int count = 0;
-    int separationCount = 0;
-    Vector3 steerPos = Vector3.zero;
-    
-    Autonomous curr = flock.mAutonomous[i];
-    Vector3 currPosition = curr.pos;
-
-
-    for (int j = 0; j < flock.numBoids; ++j)
+    void Execute(Flock flock, int i)
     {
-      //used this instead of 2 if-statements
-      //used 'continue' to skip unnecessary iterations
-      if(i == j)
-        continue;
+        Vector3 flockDir = Vector3.zero;
+        Vector3 separationDir = Vector3.zero;
+        //removed 'vector3 cohesion = vector3.zero' as it was not used
 
-      Autonomous other = flock.mAutonomous[j];
-      float sqrDist = (currPosition - other.pos).sqrMagnitude;
-      //removed if(i!=j)
-      if (sqrDist < flock.visibility * flock.visibility)
-      {
-        speed += other.Speed;
-        flockDir += other.TargetDirection;
-        steerPos += other.pos;
-        count++;
-      }
-      //removed if(i!=j)
-      if (sqrDist < flock.separationDistance * flock.separationDistance)
+        float speed = 0.0f;
+        float separationSpeed = 0.0f;
+
+        int count = 0;
+        int separationCount = 0;
+        Vector3 steerPos = Vector3.zero;
+
+        Autonomous curr = flock.mAutonomous[i];
+
+        for (int j = 0; j < flock.numBoids; ++j)
         {
-          Vector3 targetDirection = (currPosition - other.pos).normalized;
+            //used this instead of 2 if-statements
+            //used 'continue' to skip unnecessary iterations
+            if (i == j)
+                //jumps to the next iteration of the loop and ignores the remaining code in the current iteration.
+                continue;
 
-          separationDir += targetDirection;
-          separationSpeed += Mathf.Sqrt(sqrDist) * flock.weightSeparation;
-          separationCount++;
+            Autonomous other = flock.mAutonomous[j];
+            //used sqrMagnitude as it computationally less expensive than magnitude.
+            //changed all the transform.position to storedPos
+            float sqrDist = (curr.storedPos - other.storedPos).sqrMagnitude;
+            //removed if(i!=j) -> redundant
+            //simple multiplication operation is computationally less expensive than using magnitude
+            if (sqrDist < flock.visibility * flock.visibility)
+            {
+                speed += other.Speed;
+                flockDir += other.TargetDirection;
+                steerPos += other.storedPos;
+                count++;
+            }
+            //removed if(i!=j) -> redundant
+            if (sqrDist < flock.separationDistance * flock.separationDistance)
+            {
+                Vector3 targetDirection = (curr.storedPos - other.storedPos).normalized;
+
+                separationDir += targetDirection;
+                separationSpeed += Mathf.Sqrt(sqrDist) * flock.weightSeparation;
+                //added the seperation count as it was not used for the if-statement in separation count.
+                separationCount++;
+            }
         }
-      }
-    
-    if (count > 0)
-    {
-      speed = speed / count;
-      flockDir = flockDir / count;
-      flockDir.Normalize();
 
-      steerPos = steerPos / count;
+        if (count > 0)
+        {
+            speed = speed / count;
+            flockDir = flockDir / count;
+            flockDir.Normalize();
+
+            steerPos = steerPos / count;
+        }
+
+        if (separationCount > 0)
+        {
+            //used separation count instead of count since this is for separation count if-statement.
+            separationSpeed = separationSpeed / separationCount;
+            separationDir = separationDir / separationSpeed;
+            separationDir.Normalize();
+        }
+
+        curr.TargetDirection =
+          flockDir * speed * (flock.useAlignmentRule ? flock.weightAlignment : 0.0f) +
+          separationDir * separationSpeed * (flock.useSeparationRule ? flock.weightSeparation : 0.0f) +
+          (steerPos - curr.storedPos) * (flock.useCohesionRule ? flock.weightCohesion : 0.0f);
     }
 
-    if (separationCount > 0)
-    {
-      separationSpeed = separationSpeed / separationCount;
-      separationDir = separationDir / separationSpeed;
-      separationDir.Normalize();
-    }
-
-    curr.TargetDirection =
-      flockDir * speed * (flock.useAlignmentRule ? flock.weightAlignment : 0.0f) +
-      separationDir * separationSpeed * (flock.useSeparationRule ? flock.weightSeparation : 0.0f) +
-      (steerPos - curr.pos) * (flock.useCohesionRule ? flock.weightCohesion : 0.0f);
-  }
-
-
-  IEnumerator Coroutine_Flocking()
+    IEnumerator Coroutine_Flocking()
   {
     while (true)
     {
@@ -198,15 +201,19 @@ public class FlockBehaviour : MonoBehaviour
         foreach (Flock flock in flocks)
         {
           List<Autonomous> autonomousList = flock.mAutonomous;
-
+          //using multithreading to parallel for loop
+          //0 -> initial index of the loop
+          //autonomousList.Count -> exclusive upper bound of the loop range
+          //i=> -> lambda expression for each index in parallel loop
           Parallel.For(0, autonomousList.Count, i =>
           {
             Execute(flock, i);
 
             if (i % BatchSize == 0)
             {
+              //checking if the code works
               Debug.Log("flocking");
-              //yield return null;
+              //deleted as it's in the parallel loop
             }
           });
           yield return null;

@@ -20,7 +20,8 @@ public class Autonomous : MonoBehaviour
 
   public SpriteRenderer spriteRenderer;
 
-  public Vector3 pos;
+  //variable to store the transform.position
+  public Vector3 storedPos;
 
   // Start is called before the first frame update
   void Start()
@@ -28,8 +29,9 @@ public class Autonomous : MonoBehaviour
     Speed = 0.0f;
     SetRandomSpeed();
     SetRandomDirection();
-
-    pos = transform.position;
+    
+    //initialise the variable to the initial transform.position
+    storedPos = transform.position;
   }
 
   void SetRandomSpeed()
@@ -76,7 +78,9 @@ public class Autonomous : MonoBehaviour
       Speed = MaxSpeed;
 
     transform.Translate(Vector3.right * Speed * Time.deltaTime, Space.Self);
-    pos = transform.position;
+    
+    //get the latest update/final position for the stored transform.position
+    storedPos = transform.position;
   }
 
   private void FixedUpdate()
